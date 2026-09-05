@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-cf1e3c69-3e11-4443-8ea1-6fe70abf00e7/styles.css">
+<script src="_ds/industry-cf1e3c69-3e11-4443-8ea1-6fe70abf00e7/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&amp;family=Barlow:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="./ocs-data.js"></script>
+<style>
+  body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:'Barlow',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  a{color:var(--color-accent)}a:hover{color:var(--color-text)}
+  *{box-sizing:border-box}
+  input,select,button{font-family:inherit}
+  :focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column">
+
+  <header style="background:var(--color-neutral-100);border-bottom:1px solid var(--color-neutral-300)">
+    <div style="max-width:1040px;margin:0 auto;padding:24px 40px;display:flex;align-items:flex-end;justify-content:space-between;gap:32px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)">KeHE demand planning</div>
+        <h1 style="margin:0;font-family:'Barlow Condensed',system-ui,sans-serif;font-size:26px;font-weight:600;letter-spacing:-.01em">Override Calibration Score</h1>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:340px">
+        <div style="font-size:12.5px;line-height:1.55;color:var(--color-neutral-700);text-wrap:pretty;text-align:right">Upload a brand export. See how comparable products came out when they were overridden.</div>
+        <button onClick="{{ toggleCaseLog }}" class="btn btn-secondary" style="{{ caseLogBtnStyle }}">{{ caseLogLabel }}</button>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex:1;max-width:1040px;width:100%;margin:0 auto;padding:36px 40px 72px;display:flex;flex-direction:column;gap:28px">
+
+    <sc-if value="{{ caseLogOpen }}" hint-placeholder-val="">
+      <div class="blueprint" style="position:relative;display:flex;flex-direction:column;gap:14px;border:1px solid var(--color-neutral-400);padding:20px 22px">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)">Case log</div>
+            <div style="font-size:13px;color:var(--color-neutral-700)">{{ caseLogCount }}</div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <label class="field" style="gap:5px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700)">Category</span>
+              <select class="input" value="{{ fCat }}" onChange="{{ setFCat }}" style="min-width:180px;font-size:13px;padding:6px 9px">
+                <option value="all">All categories</option>
+                <sc-for list="{{ logCategories }}" as="c" hint-placeholder-count="3">
+                  <option value="{{ c.value }}">{{ c.label }}</option>
+                </sc-for>
+              </select>
+            </label>
+            <label class="field" style="gap:5px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700)">Trend</span>
+              <select class="input" value="{{ fTrend }}" onChange="{{ setFTrend }}" style="min-width:120px;font-size:13px;padding:6px 9px">
+                <option value="all">All</option>
+                <option value="viral">Viral</option>
+                <option value="organic">Organic</option>
+              </select>
+            </label>
+            <label class="field" style="gap:5px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700)">Stage</span>
+              <select class="input" value="{{ fNew }}" onChange="{{ setFNew }}" style="min-width:130px;font-size:13px;padding:6px 9px">
+                <option value="all">All</option>
+                <option value="new">New product</option>
+                <option value="established">Established</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div style="max-height:360px;overflow:auto">
+          <table class="table" style="font-size:12.5px">
+            <thead>
+              <tr>
+                <th style="text-align:left">Brand</th>
+                <th style="text-align:left">Period</th>
+                <th style="text-align:left">Category</th>
+                <th style="text-align:left">Tags</th>
+                <th style="text-align:right">Override</th>
+                <th style="text-align:right">Forecast vs actual</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ caseLogRows }}" as="r" hint-placeholder-count="6">
+                <tr>
+                  <td>{{ r.product }}</td>
+                  <td style="color:var(--color-neutral-700)">{{ r.period }}</td>
+                  <td style="color:var(--color-neutral-700)">{{ r.category }}</td>
+                  <td style="color:var(--color-neutral-700)">{{ r.tags }}</td>
+                  <td style="text-align:right">{{ r.override }}</td>
+                  <td style="{{ r.overshootStyle }}">{{ r.overshoot }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:12px;color:var(--color-neutral-700);line-height:1.6">{{ caseLogNote }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ noFile }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="blueprint" onClick="{{ pick }}" onDragOver="{{ onDragOver }}" onDragLeave="{{ onDragLeave }}" onDrop="{{ onDrop }}" style="{{ dropStyle }}">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:20px;font-weight:600;letter-spacing:.01em">Drop the brand's spreadsheet here</div>
+          <div style="font-size:13px;color:var(--color-neutral-700)">.xlsx or .csv — forecast and actual columns are what matter</div>
+          <span class="btn btn-primary blueprint" style="margin-top:6px;pointer-events:none">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>Choose a file
+          </span>
+        </div>
+        <input type="file" accept=".xlsx,.xls,.csv" ref="{{ fileRef }}" onChange="{{ onFileInput }}" style="display:none">
+        <div style="font-size:12.5px;color:var(--color-neutral-700);line-height:1.6">{{ logCoverage }}</div>
+
+        <sc-if value="{{ parseError }}" hint-placeholder-val="">
+          <div style="font-size:13px;color:var(--color-accent-800);border-left:2px solid var(--color-accent);padding-left:12px">{{ parseError }}</div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasFile }}" hint-placeholder-val="">
+      <div style="display:flex;flex-direction:column;gap:26px">
+
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:24px;border-bottom:1px solid var(--color-neutral-300);padding-bottom:12px">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)">Uploaded</div>
+            <div style="font-size:15px;font-weight:500">{{ fileName }}</div>
+            <div style="font-size:12.5px;color:var(--color-neutral-700)">{{ fileSummary }}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex:none">
+            <button onClick="{{ toggleLog }}" class="btn btn-secondary" style="{{ logBtnStyle }}">{{ historyLabel }}</button>
+            <button onClick="{{ reset }}" class="btn btn-ghost" style="flex:none">Replace file</button>
+          </div>
+        </div>
+
+        <sc-if value="{{ showLog }}" hint-placeholder-val="">
+          <div class="blueprint" style="position:relative;display:flex;flex-direction:column;gap:10px;border:1px solid var(--color-neutral-400);padding:18px 20px">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;border-bottom:1px solid var(--color-neutral-300);padding-bottom:8px">
+              <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)">Past uploads</div>
+              <button onClick="{{ clearHistory }}" class="btn btn-ghost" style="font-size:12px;padding:4px 8px">Clear all</button>
+            </div>
+            <sc-for list="{{ uploads }}" as="u" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:16px;padding:8px 0;border-bottom:1px solid var(--color-neutral-200)">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ u.name }}</div>
+                  <div style="font-size:12px;color:var(--color-neutral-700)">{{ u.meta }}</div>
+                </div>
+                <button onClick="{{ u.open }}" class="btn btn-secondary" style="flex:none;font-size:12.5px;padding:6px 12px">Open</button>
+                <button onClick="{{ u.forget }}" class="btn btn-ghost" style="flex:none;font-size:12.5px;padding:6px 10px">Remove</button>
+              </div>
+            </sc-for>
+            <div style="font-size:12px;color:var(--color-neutral-700);line-height:1.6">Reopening restores that file's brands and tags. The spreadsheet itself stays on your machine.</div>
+          </div>
+        </sc-if>
+
+        <sc-for list="{{ brands }}" as="b" hint-placeholder-count="2">
+          <div class="blueprint" style="{{ b.cardStyle }}">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+
+            <div style="display:grid;grid-template-columns:1fr auto;gap:28px;align-items:start">
+              <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:22px;font-weight:600">{{ b.name }}</div>
+                  <div style="font-size:12.5px;color:var(--color-neutral-700)">{{ b.rowLine }}</div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:18px">
+                  <label class="field" style="gap:5px">
+                    <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700)">Category</span>
+                    <select class="input" value="{{ b.category }}" onChange="{{ b.setCategory }}" style="min-width:190px;font-size:13px;padding:7px 9px">
+                      <sc-for list="{{ categories }}" as="c" hint-placeholder-count="4">
+                        <option value="{{ c.value }}">{{ c.label }}</option>
+                      </sc-for>
+                    </select>
+                  </label>
+                  <label class="field" style="gap:5px">
+                    <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700)">Trend type</span>
+                    <select class="input" value="{{ b.trend }}" onChange="{{ b.setTrend }}" style="min-width:160px;font-size:13px;padding:7px 9px">
+                      <option value="viral">Viral — sudden spike</option>
+                      <option value="organic">Organic — gradual build</option>
+                    </select>
+                  </label>
+                  <label class="field" style="gap:5px">
+                    <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700)">Stage</span>
+                    <select class="input" value="{{ b.newness }}" onChange="{{ b.setNewness }}" style="min-width:150px;font-size:13px;padding:7px 9px">
+                      <option value="new">New product</option>
+                      <option value="established">Established</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div style="text-align:right;display:flex;flex-direction:column;gap:4px;min-width:180px">
+                <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)">Comparables ran</div>
+                <div style="{{ b.figureStyle }}">{{ b.figure }}</div>
+                <div style="font-size:12.5px;color:var(--color-neutral-700)">{{ b.figureNote }}</div>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--color-neutral-300);padding-top:14px;display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:13.5px;line-height:1.6;text-wrap:pretty;max-width:62ch">{{ b.verdict }}</div>
+              <sc-if value="{{ b.ownLine }}" hint-placeholder-val="">
+                <div style="font-size:12.5px;color:var(--color-neutral-700);line-height:1.6">{{ b.ownLine }}</div>
+              </sc-if>
+              <sc-if value="{{ b.hasCases }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ b.toggle }}" class="btn btn-ghost" style="align-self:flex-start;font-size:12.5px;padding:6px 10px">{{ b.toggleLabel }}</button>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ b.open }}" hint-placeholder-val="">
+              <table class="table" style="font-size:12.5px">
+                <thead>
+                  <tr>
+                    <th style="text-align:left">Brand</th>
+                    <th style="text-align:left">Period</th>
+                    <th style="text-align:right">Override</th>
+                    <th style="text-align:right">Forecast vs actual</th>
+                    <th style="text-align:left">Excess</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ b.cases }}" as="c" hint-placeholder-count="4">
+                    <tr>
+                      <td>{{ c.product }}</td>
+                      <td style="color:var(--color-neutral-700)">{{ c.period }}</td>
+                      <td style="text-align:right">{{ c.override }}</td>
+                      <td style="{{ c.overshootStyle }}">{{ c.overshoot }}</td>
+                      <td style="color:var(--color-neutral-700)">{{ c.excess }}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div style="font-size:12px;color:var(--color-neutral-700)">{{ b.caseNote }}</div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ emptyHistory }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;border-bottom:1px solid var(--color-neutral-300);padding-bottom:8px">
+          <div style="font-family:'Barlow Condensed',system-ui,sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)">Past uploads</div>
+          <button onClick="{{ clearHistory }}" class="btn btn-ghost" style="font-size:12px;padding:4px 8px">Clear all</button>
+        </div>
+        <sc-for list="{{ uploads }}" as="u" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:16px;padding:9px 0;border-bottom:1px solid var(--color-neutral-200)">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+              <div style="font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ u.name }}</div>
+              <div style="font-size:12px;color:var(--color-neutral-700)">{{ u.meta }}</div>
+            </div>
+            <button onClick="{{ u.open }}" class="btn btn-secondary" style="flex:none;font-size:12.5px;padding:6px 12px">Open</button>
+            <button onClick="{{ u.forget }}" class="btn btn-ghost" style="flex:none;font-size:12.5px;padding:6px 10px">Remove</button>
+          </div>
+        </sc-for>
+        <div style="font-size:12px;color:var(--color-neutral-700);line-height:1.6">Reopening a past upload restores the brands, the tags you set and the comparison. The spreadsheet itself stays on your machine.</div>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:820}}">
+const D = () => (typeof window !== 'undefined' && window.OCS) || {};
+const round1 = n => Math.round(n * 10) / 10;
+const signed = n => (n > 0 ? '+' : (n < 0 ? '\u2212' : '')) + Math.abs(round1(n)) + '%';
+const median = arr => {
+  if (!arr.length) return null;
+  const s = arr.slice().sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const uniq = a => a.filter((v, i, x) => x.indexOf(v) === i);
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+// A record of what has been uploaded before. The parsed summary is kept, not the file: enough to
+// reopen a past comparison without asking for the spreadsheet again.
+const UPLOAD_KEY = 'kehe.ocs.uploads.v1';
+const loadUploads = () => {
+  try {
+    const raw = window.localStorage.getItem(UPLOAD_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) { return []; }
+};
+const saveUploads = list => {
+  try { window.localStorage.setItem(UPLOAD_KEY, JSON.stringify(list)); } catch (e) {}
+};
+const whenLabel = ts => {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ', ' + hh + ':' + mm;
+};
+
+class Component extends DCLogic {
+  state = { file: null, parseError: '', tags: {}, open: '', extra: [], uploads: [], showLog: false, caseLogOpen: false, fCat: 'all', fTrend: 'all', fNew: 'all' };
+
+  componentDidMount() { this.setState({ uploads: loadUploads() }); }
+
+  // One entry per file name: a re-upload of the same export updates its row rather than stacking up.
+  remember(file) {
+    const entry = { id: file.name + '|' + Date.now(), at: Date.now(), file: file, tags: {} };
+    const list = [entry].concat(this.state.uploads.filter(u => u.file.name !== file.name)).slice(0, 8);
+    saveUploads(list);
+    this.setState({ uploads: list, activeId: entry.id });
+  }
+
+  // Tag changes belong to the upload they were made on, so a reopened file comes back tagged.
+  persistTags(tags) {
+    const id = this.state.activeId;
+    if (!id) return;
+    const list = this.state.uploads.map(u => (u.id === id ? Object.assign({}, u, { tags: tags }) : u));
+    saveUploads(list);
+    this.setState({ uploads: list });
+  }
+
+  records() { return (D().SEED_RECORDS || []).concat(this.state.extra); }
+
+  pick = () => { if (this.fileEl) this.fileEl.click(); };
+
+  read(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const X = window.XLSX;
+        const wb = X.read(e.target.result, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = X.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const headers = (rows[0] || []).map((h, i) => (String(h) === '' ? 'Column ' + (i + 1) : String(h)));
+        const body = rows.slice(1).filter(r => r.some(c => c !== ''));
+        const { findCol, looksLikeProduct } = D();
+        const pCol = findCol(headers, 'product');
+        const cCol = findCol(headers, 'category');
+        const fCol = findCol(headers, 'forecast');
+        const aCol = findCol(headers, 'actual');
+        const cell = (row, col) => (col === -1 ? '' : String(row[col] === undefined ? '' : row[col]).trim());
+        const products = [];
+        const catBy = {};
+        const own = {};
+        body.forEach(row => {
+          const p = cell(row, pCol);
+          if (!looksLikeProduct(p)) return;
+          const hasData = row.filter((c, i) => i !== pCol && String(c === undefined ? '' : c).trim() !== '').length > 0;
+          if (!hasData) return;
+          if (products.indexOf(p) === -1) products.push(p);
+          const c = cell(row, cCol);
+          if (c && !catBy[p]) catBy[p] = c;
+          const f = parseFloat(cell(row, fCol));
+          const a = parseFloat(cell(row, aCol));
+          if (!isNaN(f) && !isNaN(a) && a !== 0) {
+            own[p] = own[p] || [];
+            own[p].push(round1((f - a) / a * 100));
+          }
+        });
+        if (!products.length) {
+          this.setState({ file: null, parseError: "That file has no product or brand column I can read. Add one named Product or Brand." });
+          return;
+        }
+        this.setState({
+          parseError: '', open: '', tags: {},
+          file: { name: file.name, rows: body.length, products, catBy, own, sheets: wb.SheetNames.length }
+        });
+        this.remember({ name: file.name, rows: body.length, products, catBy, own, sheets: wb.SheetNames.length });
+      } catch (err) {
+        this.setState({ file: null, parseError: "Couldn't read that file. Try a .xlsx or .csv export." });
+      }
+    };
+    reader.onerror = () => this.setState({ parseError: "Couldn't read that file. Try a .xlsx or .csv export." });
+    reader.readAsArrayBuffer(file);
+  }
+
+  // A brand's tags default to whatever the log's cases in that category mostly are, so the card
+  // opens on a defensible comparison rather than an arbitrary one.
+  tagsFor(name, category) {
+    const set = this.state.tags[name] || {};
+    if (set.trend && set.newness) return set;
+    const pool = this.records().filter(r => r.category === category);
+    const most = key => {
+      const counts = {};
+      pool.forEach(r => { counts[r[key]] = (counts[r[key]] || 0) + 1; });
+      return Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    };
+    // Derive from the category's own cases, then let an explicit pick overlay it — so changing the
+    // category re-derives what was never chosen without discarding what was.
+    return {
+      category: set.category,
+      trend: set.trend || most('trend') || 'viral',
+      newness: set.newness || most('newness') || 'new'
+    };
+  }
+
+  setTag(name, patch) {
+    const cur = this.state.tags[name] || this.tagsFor(name, this.categoryFor(name));
+    const tags = Object.assign({}, this.state.tags, { [name]: Object.assign({}, cur, patch) });
+    this.setState({ tags: tags });
+    this.persistTags(tags);
+  }
+
+  // Case count per category in the log, richest first — used for the select labels and as the
+  // default when the file names no category.
+  categoryCounts() {
+    const counts = {};
+    (D().CATEGORIES || []).forEach(c => { counts[c] = 0; });
+    this.records().forEach(r => { if (counts[r.category] !== undefined) counts[r.category]++; });
+    return counts;
+  }
+
+  categoryFor(name) {
+    const t = this.state.tags[name];
+    if (t && t.category) return t.category;
+    const f = this.state.file;
+    const raw = f && f.catBy[name];
+    const cats = D().CATEGORIES || [];
+    if (raw) {
+      const hit = cats.filter(c => c.toLowerCase() === String(raw).toLowerCase())[0];
+      if (hit) return hit;
+    }
+    const logged = this.records().filter(r => r.product === name)[0];
+    if (logged && cats.indexOf(logged.category) !== -1) return logged.category;
+    // No category in the file: open on the best-covered category rather than the first alphabetically,
+    // so the comparison starts somewhere with data.
+    const counts = this.categoryCounts();
+    return cats.slice().sort((a, b) => counts[b] - counts[a])[0];
+  }
+
+  buildBrand(name) {
+    const f = this.state.file;
+    const category = this.categoryFor(name);
+    const tags = this.tagsFor(name, category);
+    // Comparables are other brands only: the planner is asking what happened elsewhere.
+    const pool = this.records().filter(r =>
+      r.product !== name && r.category === category && r.trend === tags.trend && r.newness === tags.newness);
+    const overshoots = pool.map(r => r.overshoot).filter(v => typeof v === 'number');
+    const med = median(overshoots);
+    const overrides = pool.map(r => r.override).filter(v => typeof v === 'number');
+    const medOv = median(overrides);
+    const high = overshoots.filter(v => v > 0).length;
+    const brandCount = uniq(pool.map(r => r.product)).length;
+
+    let verdict;
+    if (!pool.length) {
+      const looser = this.records().filter(r => r.product !== name && r.category === category);
+      const counts = this.categoryCounts();
+      const covered = Object.keys(counts).filter(c => counts[c] > 0).sort((a, b) => counts[b] - counts[a]);
+      verdict = 'No other brand in the log is ' + category.toLowerCase() + ', ' + tags.trend + ', ' +
+        (tags.newness === 'new' ? 'new' : 'established') + '. ' +
+        (looser.length
+          ? 'There are ' + plural(looser.length, 'case') + ' in this category under other tags — change the trend type or stage to see them.'
+          : 'The log covers ' + covered.map(c => c.toLowerCase() + ' (' + counts[c] + ')').join(', ') + '.');
+    } else if (med > 5) {
+      verdict = 'Comparable forecasts ran high. ' + high + ' of ' + pool.length + ' came out over actual demand' +
+        (medOv !== null ? ', on overrides that typically sat ' + signed(medOv) + ' above run rate' : '') +
+        '. Set this brand below that and you are inside what has worked.';
+    } else if (med < -5) {
+      verdict = 'Comparable forecasts ran under actual demand' +
+        (medOv !== null ? ' at overrides around ' + signed(medOv) : '') +
+        '. There is room above the number you would otherwise call.';
+    } else {
+      verdict = 'Comparable forecasts landed close to actual demand' +
+        (medOv !== null ? ' at overrides around ' + signed(medOv) : '') +
+        '. ' + high + ' of ' + pool.length + ' ran high, the rest under.';
+    }
+
+    const ownShoots = (f && f.own[name]) || [];
+    const ownMed = median(ownShoots);
+    const ownLogged = this.records().filter(r => r.product === name && typeof r.overshoot === 'number');
+    let ownLine = '';
+    if (ownShoots.length) {
+      ownLine = 'In this file, ' + name + ' ran ' + signed(ownMed) + ' against actual across ' + plural(ownShoots.length, 'period') + '.';
+    } else if (ownLogged.length) {
+      ownLine = name + ' has ' + plural(ownLogged.length, 'case') + ' already in the log, running ' + signed(median(ownLogged.map(r => r.overshoot))) + ' on average.';
+    }
+
+    const cases = pool.slice()
+      .sort((a, b) => (b.override === null ? -1e9 : b.override) - (a.override === null ? -1e9 : a.override))
+      .slice(0, 8)
+      .map(r => ({
+        product: r.product,
+        period: r.period,
+        override: typeof r.override === 'number' ? signed(r.override) : '—',
+        overshoot: signed(r.overshoot),
+        overshootStyle: 'text-align:right;font-weight:500;color:' + (r.overshoot > 5 ? 'var(--color-accent-800)' : 'var(--color-neutral-800)'),
+        excess: r.excess && r.excess !== 'Not recorded' ? r.excess : '—'
+      }));
+
+    const open = this.state.open === name;
+    return {
+      name, category, trend: tags.trend, newness: tags.newness,
+      cardStyle: 'position:relative;border:1px solid var(--color-neutral-400);padding:24px 26px;display:flex;flex-direction:column;gap:18px;background:transparent',
+      rowLine: (f && f.own[name] && f.own[name].length)
+        ? plural(f.own[name].length, 'period') + ' read from the file'
+        : 'no forecast-and-actual pair in the file for this brand',
+      figure: pool.length ? signed(med) : '—',
+      figureStyle: 'font-family:"Barlow Condensed",system-ui,sans-serif;font-size:38px;font-weight:600;line-height:1;color:' + (pool.length && med > 5 ? 'var(--color-accent-800)' : 'var(--color-text)'),
+      figureNote: pool.length ? 'median of ' + plural(pool.length, 'case') + ' across ' + plural(brandCount, 'other brand') : 'no comparable cases',
+      verdict, ownLine,
+      hasCases: pool.length ? true : '',
+      open: open ? true : '',
+      toggleLabel: open ? 'Hide the cases' : 'Show the ' + pool.length + ' comparable cases',
+      toggle: () => this.setState({ open: open ? '' : name }),
+      cases,
+      caseNote: pool.length > 8 ? 'Largest 8 overrides of ' + pool.length + ' matching cases. Cases with no override column show a dash.' : 'Cases with no override column in the source file show a dash.',
+      // Changing the category drops the derived trend/stage so they re-derive from the new
+      // category's own cases instead of carrying over a fallback that has no data there.
+      setCategory: e => {
+        const tags = Object.assign({}, this.state.tags, { [name]: { category: e.target.value } });
+        this.setState({ tags: tags });
+        this.persistTags(tags);
+      },
+      setTrend: e => this.setTag(name, { trend: e.target.value }),
+      setNewness: e => this.setTag(name, { newness: e.target.value })
+    };
+  }
+
+  // The log is readable on its own, with or without a file open — a planner may just want to see
+  // what has been recorded.
+  caseLog() {
+    const s = this.state;
+    return this.records().filter(r =>
+      (s.fCat === 'all' || r.category === s.fCat) &&
+      (s.fTrend === 'all' || r.trend === s.fTrend) &&
+      (s.fNew === 'all' || r.newness === s.fNew));
+  }
+
+  renderVals() {
+    const f = this.state.file;
+    const recs = this.records();
+    return {
+      hasFile: f ? true : '',
+      noFile: f ? '' : true,
+      parseError: this.state.parseError,
+      categories: (() => {
+        const counts = this.categoryCounts();
+        return (D().CATEGORIES || []).map(c => ({
+          value: c,
+          label: c + (counts[c] ? ' — ' + plural(counts[c], 'case') : ' — no cases')
+        }));
+      })(),
+      fileName: f ? f.name : '',
+      fileSummary: f ? plural(f.rows, 'row') + ' · ' + plural(f.products.length, 'brand') + (f.sheets > 1 ? ' · first of ' + f.sheets + ' sheets' : '') : '',
+      logCoverage: plural(recs.length, 'past case') + ' in the log, across ' + plural(uniq(recs.map(r => r.product)).length, 'brand') +
+        ' and ' + plural(uniq(recs.map(r => r.category)).length, 'category').replace('categorys', 'categories') + '.',
+      brands: f ? f.products.map(p => this.buildBrand(p)) : [],
+      hasHistory: this.state.uploads.length ? true : '',
+      // On the empty screen the log is simply there; with a file open it sits behind the button,
+      // directly under the bar that button lives in.
+      emptyHistory: this.state.uploads.length && !f ? true : '',
+      showLog: this.state.uploads.length && f && this.state.showLog ? true : '',
+      logBtnStyle: 'flex:none' + (this.state.showLog ? ';background:var(--color-accent-200);border-color:var(--color-accent)' : ''),
+      historyLabel: 'Past uploads (' + this.state.uploads.length + ')',
+      toggleLog: () => this.setState({ showLog: !this.state.showLog }),
+      uploads: this.state.uploads.map(u => ({
+        name: u.file.name,
+        meta: whenLabel(u.at) + ' · ' + plural(u.file.rows, 'row') + ' · ' + plural(u.file.products.length, 'brand'),
+        open: () => this.setState({ file: u.file, tags: u.tags || {}, activeId: u.id, open: '', parseError: '', showLog: false }),
+        forget: () => {
+          const list = this.state.uploads.filter(x => x.id !== u.id);
+          saveUploads(list);
+          this.setState({ uploads: list });
+        }
+      })),
+      clearHistory: () => { saveUploads([]); this.setState({ uploads: [] }); },
+      caseLogOpen: this.state.caseLogOpen ? true : '',
+      caseLogLabel: 'Case log (' + recs.length + ')',
+      caseLogBtnStyle: 'flex:none' + (this.state.caseLogOpen ? ';background:var(--color-accent-200);border-color:var(--color-accent)' : ''),
+      toggleCaseLog: () => this.setState({ caseLogOpen: !this.state.caseLogOpen }),
+      fCat: this.state.fCat, fTrend: this.state.fTrend, fNew: this.state.fNew,
+      setFCat: e => this.setState({ fCat: e.target.value }),
+      setFTrend: e => this.setState({ fTrend: e.target.value }),
+      setFNew: e => this.setState({ fNew: e.target.value }),
+      logCategories: (() => {
+        const counts = this.categoryCounts();
+        return Object.keys(counts).filter(c => counts[c] > 0).sort((a, b) => counts[b] - counts[a])
+          .map(c => ({ value: c, label: c + ' — ' + plural(counts[c], 'case') }));
+      })(),
+      caseLogCount: (() => {
+        const n = this.caseLog().length;
+        return n === recs.length
+          ? plural(n, 'case') + ' recorded'
+          : plural(n, 'case') + ' of ' + recs.length + ' match these filters';
+      })(),
+      caseLogRows: this.caseLog().slice(0, 200).map(r => ({
+        product: r.product,
+        period: r.period,
+        category: r.category,
+        tags: (r.trend === 'viral' ? 'Viral' : 'Organic') + ' · ' + (r.newness === 'new' ? 'New' : 'Established'),
+        override: typeof r.override === 'number' ? signed(r.override) : '—',
+        overshoot: signed(r.overshoot),
+        overshootStyle: 'text-align:right;font-weight:500;color:' + (r.overshoot > 5 ? 'var(--color-accent-800)' : 'var(--color-neutral-800)')
+      })),
+      caseLogNote: 'A dash under Override means the source file carried no override column for that period; the outcome is still recorded.',
+      pick: this.pick,
+      fileRef: el => { this.fileEl = el; },
+      onFileInput: e => this.read(e.target.files && e.target.files[0]),
+      onDragOver: e => { e.preventDefault(); if (!this.state.drag) this.setState({ drag: true }); },
+      onDragLeave: () => this.setState({ drag: false }),
+      onDrop: e => {
+        e.preventDefault();
+        this.setState({ drag: false });
+        this.read(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+      },
+      dropStyle: 'position:relative;border:1px ' + (this.state.drag ? 'solid var(--color-accent)' : 'dashed var(--color-neutral-400)') +
+        ';background:' + (this.state.drag ? 'var(--color-accent-100)' : 'transparent') +
+        ';padding:56px 32px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;cursor:pointer',
+      reset: () => this.setState({ file: null, open: '', tags: {}, parseError: '' })
+    };
+  }
+}
+</script>
+</body>
+</html>

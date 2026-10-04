@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- No network, no storage: the page cannot send anything anywhere. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>Spending Saving Guide</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1c2430; --mute:#667085; --line:#e3e6ec; --accent:#2a6df4; --good:#1a8f5a; --bad:#c8372d; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14181f; --card:#1d232d; --ink:#e8ecf2; --mute:#98a2b3; --line:#2c3441; --accent:#6c9bff; --good:#4cc790; --bad:#ff7a70; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui,sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:16px; }
+  h1 { font-size:1.5rem; margin:8px 0 2px; }
+  h2 { font-size:1.1rem; margin:0 0 10px; }
+  .sub { color:var(--mute); margin:0 0 16px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .row { display:grid; gap:8px; margin-bottom:8px; align-items:end; }
+  .row.income { grid-template-columns:1.4fr 1fr 1fr 1.2fr auto; }
+  .row.debt { grid-template-columns:1.4fr 1fr .7fr 1fr .7fr auto; }
+  label { font-size:.75rem; color:var(--mute); display:block; }
+  input, select { width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; }
+  button { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .x { color:var(--bad); }
+  .settings { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:12px; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .card b { display:block; font-size:1.3rem; }
+  .card span { color:var(--mute); font-size:.8rem; }
+  .good { color:var(--good); } .bad { color:var(--bad); }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:8px 4px; border-top:1px solid var(--line); vertical-align:top; }
+  td.d { white-space:nowrap; color:var(--mute); width:1%; padding-right:12px; }
+  td.a { text-align:right; white-space:nowrap; font-weight:600; }
+  .warn { background:rgba(200,55,45,.1); border:1px solid var(--bad); border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+  .note { color:var(--mute); font-size:.8rem; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; }
+  @media (max-width:640px) {
+    .row.income, .row.debt { grid-template-columns:1fr 1fr; }
+    .row .del { grid-column:1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spending Saving Guide</h1>
+  <p class="sub">Enter your income and debts. Get told what to pay, when, and how much to set aside. Nothing is saved or sent anywhere — closing the tab erases it.</p>
+
+  <section>
+    <h2>Income</h2>
+    <div id="incomes"></div>
+    <button id="addIncome">+ Add income</button>
+  </section>
+
+  <section>
+    <h2>Debts</h2>
+    <div id="debts"></div>
+    <button id="addDebt">+ Add debt</button>
+  </section>
+
+  <section>
+    <h2>Your plan settings</h2>
+    <div class="settings">
+      <div><label>Monthly bills &amp; living costs (rent, food, utilities… not the debts above)</label><input id="expenses" type="number" min="0" step="any" value="0"></div>
+      <div><label>% of leftover money to put in savings</label><input id="savePct" type="number" min="0" max="100" step="any" value="20"></div>
+      <div><label>Debt payoff order</label>
+        <select id="strategy">
+          <option value="avalanche">Highest interest first (saves most money)</option>
+          <option value="snowball">Smallest balance first (quick wins)</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <section id="results"></section>
+
+  <section>
+    <h2>Optional: keep a copy yourself</h2>
+    <p class="note">The page stores nothing. If you want to avoid retyping, you can download a file to your own computer and load it back later. Delete it whenever you like.</p>
+    <div class="bar">
+      <button id="save">Download my data</button>
+      <button id="loadBtn">Load from file</button>
+      <input id="load" type="file" accept="application/json" hidden>
+    </div>
+  </section>
+  <p class="note">This is a simple planning aid, not financial advice. Interest is estimated as balance × APR ÷ 12 each month.</p>
+</main>
+
+<script>
+const state = { incomes: [], debts: [], expenses: 0, savePct: 20, strategy: 'avalanche' };
+const FREQ = { weekly: 52/12, biweekly: 26/12, semimonthly: 2, monthly: 1 };
+const money = n => new Intl.NumberFormat(undefined, { style:'currency', currency:'USD' }).format(n);
+const $ = id => document.getElementById(id);
+
+// ---------- date helpers (local time, no timezone surprises) ----------
+const parseDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const daysInMonth = (y, m) => new Date(y, m+1, 0).getDate();
+const dayInMonth = (y, m, day) => new Date(y, m, Math.min(day, daysInMonth(y, m)));
+const fmtDate = d => d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+function paydays(inc, start, end) {
+  const out = [];
+  if (inc.freq === 'semimonthly') {
+    for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= end; d = new Date(d.getFullYear(), d.getMonth()+1, 1)) {
+      for (const day of [1, 15]) { const p = dayInMonth(d.getFullYear(), d.getMonth(), day); if (p >= start && p <= end) out.push(p); }
+    }
+    return out;
+  }
+  if (!inc.date) return out;
+  const first = parseDate(inc.date);
+  if (inc.freq === 'monthly') {
+    for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= end; d = new Date(d.getFullYear(), d.getMonth()+1, 1)) {
+      const p = dayInMonth(d.getFullYear(), d.getMonth(), first.getDate()); if (p >= start && p <= end) out.push(p);
+    }
+    return out;
+  }
+  const step = inc.freq === 'weekly' ? 7 : 14;
+  let p = first;
+  if (p < start) p = addDays(p, Math.ceil(Math.round((start - p) / 864e5) / step) * step);
+  for (; p <= end; p = addDays(p, step)) out.push(p);
+  return out;
+}
+
+// ---------- plan math ----------
+function compute() {
+  const incomes = state.incomes.filter(i => i.amount > 0);
+  const debts = state.debts.filter(d => d.balance > 0);
+  const monthlyIncome = incomes.reduce((s,i) => s + i.amount * FREQ[i.freq], 0);
+  const mins = debts.reduce((s,d) => s + Math.min(d.min, d.balance), 0);
+  const free = monthlyIncome - state.expenses - mins;
+  const saveMonthly = Math.max(0, free) * Math.min(100, Math.max(0, state.savePct)) / 100;
+  const extra = Math.max(0, free) - saveMonthly;
+  const order = [...debts].sort(state.strategy === 'snowball'
+    ? (a,b) => a.balance - b.balance || b.apr - a.apr
+    : (a,b) => b.apr - a.apr || a.balance - b.balance);
+  return { incomes, debts, monthlyIncome, mins, free, saveMonthly, extra, order };
+}
+
+function simulate(p) {
+  let bal = new Map(p.debts.map(d => [d, d.balance]));
+  const budget = p.mins + p.extra;
+  let interest = 0, months = 0;
+  while ([...bal.values()].some(b => b > 0.005) && months < 600) {
+    months++;
+    for (const [d,b] of bal) if (b > 0) { const i = b * d.apr / 100 / 12; bal.set(d, b + i); interest += i; }
+    let left = budget;
+    for (const d of p.debts) { const pay = Math.min(d.min, bal.get(d), left); bal.set(d, bal.get(d) - pay); left -= pay; }
+    for (const d of p.order) { if (left <= 0) break; const pay = Math.min(left, bal.get(d)); bal.set(d, bal.get(d) - pay); left -= pay; }
+  }
+  return { months, interest, done: ![...bal.values()].some(b => b > 0.005) };
+}
+
+// ---------- rendering ----------
+function render() {
+  const p = compute(), el = $('results');
+  el.replaceChildren();
+  const h = document.createElement('h2'); h.textContent = 'Your plan'; el.append(h);
+  const warn = msg => { const w = document.createElement('div'); w.className = 'warn'; w.textContent = msg; el.append(w); };
+
+  if (!p.incomes.length) { const n = document.createElement('p'); n.className = 'note'; n.textContent = 'Add at least one income to see your plan.'; el.append(n); return; }
+  if (p.free < 0) warn(`You're short by ${money(-p.free)} a month after bills and minimum payments. Cut spending or raise income before putting anything extra toward debt.`);
+
+  const sim = p.debts.length ? simulate(p) : null;
+  const cards = [
+    ['Monthly income', money(p.monthlyIncome)],
+    ['Bills + minimum payments', money(state.expenses + p.mins)],
+    ['Put in savings / month', money(p.saveMonthly), 'good'],
+    ['Extra to debt / month', money(p.extra), 'good'],
+  ];
+  if (sim) {
+    const when = new Date(); when.setMonth(when.getMonth() + sim.months);
+    cards.push(['Debt-free', sim.done ? when.toLocaleDateString(undefined, { month:'long', year:'numeric' }) : 'Not at this pace', sim.done ? '' : 'bad']);
+    if (sim.done) cards.push(['Total interest', money(sim.interest)]);
+  }
+  const grid = document.createElement('div'); grid.className = 'cards';
+  for (const [label, val, cls] of cards) {
+    const c = document.createElement('div'); c.className = 'card';
+    const b = document.createElement('b'); b.textContent = val; if (cls) b.className = cls;
+    const s = document.createElement('span'); s.textContent = label;
+    c.append(b, s); grid.append(c);
+  }
+  el.append(grid);
+  if (sim && !sim.done) warn('At the current payments these debts would take over 50 years to clear. Increase payments or lower expenses.');
+
+  if (p.debts.length && p.order[0]) {
+    const t = document.createElement('p');
+    t.textContent = `Extra money goes to: ${p.order[0].name || 'Unnamed debt'}. Pay only the minimum on the others until it's gone.`;
+    el.append(t);
+  }
+
+  // Next 60 days, in date order
+  const today = new Date(); const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const end = addDays(start, 60), events = [];
+  for (const inc of p.incomes) {
+    const share = p.monthlyIncome ? inc.amount / p.monthlyIncome : 0;
+    for (const d of paydays(inc, start, end)) {
+      const save = p.saveMonthly * share;
+      events.push({ d, type: 'in', text: `Payday: ${inc.name || 'Income'} (+${money(inc.amount)})`,
+        sub: save > 0 ? `Move ${money(save)} into savings right away.` : '', amt: save, order: 0 });
+    }
+  }
+  for (const debt of p.debts) {
+    for (let m = 0; m <= 2; m++) {
+      const d = dayInMonth(start.getFullYear(), start.getMonth() + m, debt.due || 1);
+      if (d < start || d > end) continue;
+      const isTarget = debt === p.order[0], pay = Math.min(debt.balance, debt.min + (isTarget ? p.extra : 0));
+      events.push({ d, type: 'out', text: `Pay ${debt.name || 'Debt'}`, sub: isTarget && p.extra > 0 ? `${money(debt.min)} minimum + ${money(p.extra)} extra` : 'Minimum payment', amt: pay, order: 1 });
+    }
+  }
+  events.sort((a,b) => a.d - b.d || a.order - b.order);
+
+  const h3 = document.createElement('h2'); h3.textContent = 'What to do, and when (next 60 days)'; el.append(h3);
+  if (!events.length) { const n = document.createElement('p'); n.className = 'note'; n.textContent = 'Add a pay date for your income and a due day for your debts.'; el.append(n); return; }
+  const tbl = document.createElement('table');
+  for (const e of events) {
+    const tr = document.createElement('tr');
+    const d = document.createElement('td'); d.className = 'd'; d.textContent = fmtDate(e.d);
+    const w = document.createElement('td'); w.textContent = e.text;
+    if (e.sub) { const s = document.createElement('div'); s.className = 'note'; s.textContent = e.sub; w.append(s); }
+    const a = document.createElement('td'); a.className = 'a'; 
+    if (e.type === 'out') { a.textContent = money(e.amt); a.classList.add('bad'); }
+    else if (e.amt > 0) { a.textContent = money(e.amt); a.classList.add('good'); }
+    tr.append(d, w, a); tbl.append(tr);
+  }
+  el.append(tbl);
+  const note = document.createElement('p'); note.className = 'note';
+  note.textContent = 'Red = money going out to a debt. Green = money to set aside for savings from that paycheck. Whatever remains after that is for your bills and living costs.';
+  el.append(note);
+}
+
+function field(labelText, input) {
+  const w = document.createElement('div'), l = document.createElement('label');
+  l.textContent = labelText; w.append(l, input); return w;
+}
+function bound(item, key, type, attrs = {}) {
+  const i = document.createElement('input'); i.type = type;
+  Object.assign(i, attrs);
+  i.value = item[key] ?? '';
+  i.addEventListener('input', () => { item[key] = type === 'number' ? (parseFloat(i.value) || 0) : i.value; render(); });
+  return i;
+}
+
+function renderIncomes() {
+  const box = $('incomes'); box.replaceChildren();
+  state.incomes.forEach((inc, idx) => {
+    const r = document.createElement('div'); r.className = 'row income';
+    const sel = document.createElement('select');
+    for (const [v, t] of [['weekly','Weekly'],['biweekly','Every 2 weeks'],['semimonthly','Twice a month (1st & 15th)'],['monthly','Monthly']]) sel.append(new Option(t, v));
+    sel.value = inc.freq;
+    const date = bound(inc, 'date', 'date');
+    const sync = () => { date.disabled = inc.freq === 'semimonthly'; };
+    sel.addEventListener('change', () => { inc.freq = sel.value; sync(); render(); }); sync();
+    const del = document.createElement('button'); del.textContent = '✕'; del.className = 'x del'; del.title = 'Remove';
+    del.addEventListener('click', () => { state.incomes.splice(idx, 1); renderIncomes(); render(); });
+    r.append(field('Name', bound(inc, 'name', 'text', { placeholder: 'Job' })),
+      field('Amount per paycheck', bound(inc, 'amount', 'number', { min: 0, step: 'any' })),
+      field('How often', sel), field('A pay date', date), del);
+    box.append(r);
+  });
+}
+
+function renderDebts() {
+  const box = $('debts'); box.replaceChildren();
+  state.debts.forEach((d, idx) => {
+    const r = document.createElement('div'); r.className = 'row debt';
+    const del = document.createElement('button'); del.textContent = '✕'; del.className = 'x del'; del.title = 'Remove';
+    del.addEventListener('click', () => { state.debts.splice(idx, 1); renderDebts(); render(); });
+    r.append(field('Name', bound(d, 'name', 'text', { placeholder: 'Credit card' })),
+      field('Balance owed', bound(d, 'balance', 'number', { min: 0, step: 'any' })),
+      field('APR %', bound(d, 'apr', 'number', { min: 0, step: 'any' })),
+      field('Minimum / month', bound(d, 'min', 'number', { min: 0, step: 'any' })),
+      field('Due day (1-31)', bound(d, 'due', 'number', { min: 1, max: 31, step: 1 })), del);
+    box.append(r);
+  });
+}
+
+function refreshAll() {
+  $('expenses').value = state.expenses; $('savePct').value = state.savePct; $('strategy').value = state.strategy;
+  renderIncomes(); renderDebts(); render();
+}
+
+// ---------- wiring ----------
+$('addIncome').onclick = () => { state.incomes.push({ name:'', amount:0, freq:'biweekly', date: iso(new Date()) }); renderIncomes(); render(); };
+$('addDebt').onclick = () => { state.debts.push({ name:'', balance:0, apr:0, min:0, due:1 }); renderDebts(); render(); };
+$('expenses').oninput = e => { state.expenses = parseFloat(e.target.value) || 0; render(); };
+$('savePct').oninput = e => { state.savePct = parseFloat(e.target.value) || 0; render(); };
+$('strategy').onchange = e => { state.strategy = e.target.value; render(); };
+
+$('save').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }));
+  a.download = 'my-spending-plan.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('loadBtn').onclick = () => $('load').click();
+$('load').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const j = JSON.parse(r.result);
+      Object.assign(state, { incomes: j.incomes || [], debts: j.debts || [], expenses: +j.expenses || 0, savePct: +j.savePct || 0,
+        strategy: j.strategy === 'snowball' ? 'snowball' : 'avalanche' });
+      refreshAll();
+    } catch { alert("That file couldn't be read."); }
+  };
+  r.readAsText(f); e.target.value = '';
+};
+
+state.incomes.push({ name:'', amount:0, freq:'biweekly', date: iso(new Date()) });
+state.debts.push({ name:'', balance:0, apr:0, min:0, due:1 });
+refreshAll();
+</script>
+</body>
+</html>
